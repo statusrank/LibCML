@@ -6,5 +6,6 @@ This is an easy-to-use library of Collaborative Metric Learning (CML) based reco
 - CPE
 - TransCF
 - AddCML
+- LRML
 
 Will be uploaded soon.
