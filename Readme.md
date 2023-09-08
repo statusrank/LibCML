@@ -28,14 +28,17 @@ problem as a multi-task learning problem to boost the performance of CML, includ
 # Citation
 Please cite our paper if you find this libray is helpful.
 
-> @inproceedings{DPCML, 
+```
+@inproceedings{DPCML, 
 author    = {Shilong Bao, Qianqian Xu, Zhiyong Yang, Yuan He, Xiaochun Cao and Qingming Huang},
   title     = {The Minority Matters: A Diversity-Promoting Collaborative Metric Learning Algorithm},
   booktitle = {NeurIPS},
   year      = {2022}
 }
+```
 
-> @article{DBLP:journals/pami/BaoX0CH23,
+```
+@article{DBLP:journals/pami/BaoX0CH23,
   author       = {Shilong Bao and
                   Qianqian Xu and
                   Zhiyong Yang and
@@ -49,5 +52,5 @@ author    = {Shilong Bao, Qianqian Xu, Zhiyong Yang, Yuan He, Xiaochun Cao and Q
   pages        = {1017--1035},
   year         = {2023}
 }
-
+```
 **Please feel relaxed to contact me at baoshilong@iie.ac.cn if there are any questions.**
