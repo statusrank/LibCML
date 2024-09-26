@@ -46,11 +46,19 @@ class CML(nn.Module):
         nn.init.normal_(self.user_embeddings.weight, mean=0, std=0.01)
 
         # item embeddings
-        self.item_embeddings = nn.Embedding(num_items, self.dim, max_norm=self.max_norm)
+        self.item_embeddings = nn.Embedding(num_items, self.dim)
         nn.init.normal_(self.item_embeddings.weight, mean=0, std= 1.0 / (self.dim ** 0.5))
 
     def ClipNorm(self):
+        def normalize_embeddings(embedding):
+            import torch.nn.functional as F
+            with torch.no_grad():  
+                weight = embedding.weight
+                embedding.weight.copy_(F.normalize(weight, p=2, dim=1).clamp(max=1.0))
+        
+        normalize_embeddings(self.item_embeddings)
         with torch.no_grad():
+            
             user_embeddings_weight = self.user_embeddings.weight.data
             user_embeddings_weight = user_embeddings_weight.view(self.num_users, 
                                                                  self.per_user_embed_k, 

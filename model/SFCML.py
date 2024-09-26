@@ -17,6 +17,8 @@ class SFCML(nn.Module):
                  num_items,
                  user_item_matrix,
                  margin,
+                 user_max_norm = 1.0,
+                 item_const_norm = 1.0,
                  device = torch.device('cpu')
                  ):
         super(SFCML, self).__init__()
@@ -27,10 +29,13 @@ class SFCML(nn.Module):
         self.num_items = num_items
         self.margin = margin
         self.device = device
+        self.item_const_norm = item_const_norm
+        self.user_max_norm = user_max_norm
 
         # user_embedding = r1
         self.user_embeddings = nn.Embedding(num_users, self.dim)
         # self.user_embeddings.weight.data.normal_(0, 0.1)
+
         self.ClipUserNorm()
 
         # item embedding = r2
@@ -81,17 +86,17 @@ class SFCML(nn.Module):
         target = target.cuda()
         Yp  = Yp.cuda()
         Yn = Yn.cuda()
-        batch_size = pred.shape[0]
+        # batch_size = pred.shape[0]
         diff = pred - self.margin * target # (batch_users, num_items)
         weight = Yp + Yn # (batch_users, num_items)
         A = diff.mul(weight).mul(diff).sum(1, keepdim=True) # (batch_users, 1)
         B = (diff.mul(Yn).sum(1, keepdim=True)) * (Yp.mul(diff).sum(1, keepdim=True)) # (batch_users, 1)
-        return torch.sum(A - 2 * B) / batch_size
+        return torch.mean(A - 2 * B)
 
     @torch.no_grad()
     def ClipUserNorm(self):
 
-        self.user_embeddings.weight.data = self.user_embeddings.weight.data * self.args.user_max_norm / torch.norm(self.user_embeddings.weight.data, 
+        self.user_embeddings.weight.data = self.user_embeddings.weight.data * self.user_max_norm / torch.norm(self.user_embeddings.weight.data, 
                                                                                        p=2, 
                                                                                        dim=-1, 
                                                                                        keepdim=True) 
@@ -100,7 +105,7 @@ class SFCML(nn.Module):
     @torch.no_grad()
     def ClipItemNorm(self):
 
-        self.item_embeddings.weight.data = self.item_embeddings.weight.data * self.args.item_const_norm / torch.norm(self.item_embeddings.weight.data, 
+        self.item_embeddings.weight.data = self.item_embeddings.weight.data * self.item_const_norm / torch.norm(self.item_embeddings.weight.data, 
                                                                                        p=2, 
                                                                                        dim=-1, 
                                                                                        keepdim=True) 

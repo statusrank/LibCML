@@ -12,7 +12,7 @@ class CPE(nn.Module):
     def __init__(self,
                  num_users, 
                  num_items,
-                 margin=1.2,
+                 margin=0.5,
                  dim=256,
                  max_norm=1.0,
                  cov_loss_reg = 0.): # Using Cov loss will slow down the training process heavily. Be careful to Enable it.
@@ -25,11 +25,11 @@ class CPE(nn.Module):
         self.max_norm = max_norm
 
         # user embeddings
-        self.user_embeddings = nn.Embedding(num_users, self.dim, max_norm=self.max_norm)
+        self.user_embeddings = nn.Embedding(num_users, self.dim)
         nn.init.normal_(self.user_embeddings.weight, mean=0, std=0.01)
 
         # item embeddings
-        self.item_embeddings = nn.Embedding(num_items, self.dim, max_norm=self.max_norm)
+        self.item_embeddings = nn.Embedding(num_items, self.dim)
         nn.init.normal_(self.item_embeddings.weight, mean=0, std= 1.0 / (self.dim ** 0.5))
 
         self.cov_loss_reg = cov_loss_reg
@@ -58,7 +58,13 @@ class CPE(nn.Module):
     
     @torch.no_grad()
     def ClipNorm(self):
-        pass
+        def normalize_embeddings(embedding):
+            import torch.nn.functional as F
+            with torch.no_grad():  
+                weight = embedding.weight
+                embedding.weight.copy_(F.normalize(weight, p=2, dim=1).clamp(max=1.0))
+        normalize_embeddings(self.user_embeddings)
+        normalize_embeddings(self.item_embeddings)
 
     def forward(self, user_ids, pos_ids, neg_ids):
         
@@ -81,12 +87,12 @@ class CPE(nn.Module):
         masks = torch.eye(cov_matrix.shape[0]).cuda()
         target_matrixs = cov_matrix * masks
 
-        # eig_values, _ = torch.eig(cov_matrix.cuda(), eigenvectors=True)
+        eig_values, _ = torch.linalg.eig(cov_matrix.cuda())
 
-        # log_determinant_of_C = torch.sum(eig_values[:, 0].log()).cuda()
+        log_determinant_of_C = torch.sum((eig_values + 1e-8).float().log()).cuda()
 
-        # return torch.trace(cov_matrix) - log_determinant_of_C - self.dim
-        return (cov_matrix - target_matrixs).square().sum()
+        return torch.trace(cov_matrix) - log_determinant_of_C - self.dim
+        # return (cov_matrix - target_matrixs).square().sum()
     
     def predict(self, user_ids):
         

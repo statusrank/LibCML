@@ -23,7 +23,21 @@ problem as a multi-task learning problem to boost the performance of CML, includ
 
 - [Diversity-Promoting Collaborative Metric Learning](https://arxiv.org/pdf/2209.15292.pdf) (**DPCML**, NeurIPS, 2022): A state-of-art Diversity-Promoting Collaborative Metric Learning (DPCML), with the hope of considering the commonly ignored minority interest of the user.
 
+
+- [Improved Diversity-Promoting Collaborative Metric Learning for Recommendation](https://ieeexplore.ieee.org/abstract/document/10553349) (**ImpDPCML**, TPAMI, 2024): an upgraded version of DPCML. (Code are released as soon as possible)
+
 - [Sampling-Free Collaborative Metric Learning](https://arxiv.org/pdf/2206.11549.pdf) (**SFCML**, TPAMI, 2022): A state-of-art algorithm to learn CML without negative sampling to get rid of the bias, from which an effective acceleration method is constructed to overcome the heavy computational burden. 
+
+# HOW TO USE?
+**We have tested our library under PyTorch1.13**, the other versions might lead to a little difference.
+You should configure corresponding parameters of the algorithm to run, where '--model', '--data_path', '--lr' must be provided.
+A few running examples:
+
+```shell
+python3 train_example.py --model SFCML --data_path data/ml-100k --lr=0.05 --dim 256
+python3 train_example.py --model CPE --data_path data/ml-100k --lr=0.05 
+python3 train_example.py --model CRML --data_path data/ml-100k --lr=0.01
+```
 
 # Citation
 Please cite our paper if you find this libray is helpful.

@@ -13,10 +13,10 @@ from evaluator import *
 from torch.utils.data import DataLoader
 from model import TransCF, LRML, SFCML, CPE, COCML, HarCML, CRML
 from utils import *
-from torch.optim import Adam, Adagrad
+from torch.optim import Adam, Adagrad,lr_scheduler
 from scipy import sparse
 from scipy.sparse import coo_matrix, dok_matrix
-
+from tqdm import tqdm
 torch.cuda.empty_cache()
 gc.collect()
 
@@ -40,20 +40,30 @@ OPT_DICTS = {
         'SFCML': Adagrad,
         'CRML': Adam
     }
+
+ALL_SAMS = {
+    'CPE': 'hard',
+    'COCML': 'uniform',
+    'HarCML': 'hard',
+    'TransCF': 'uniform',
+    'LRML': 'uniform',
+    'SFCML': None,
+    'CRML': 'uniform'
+}
 def parse_args():
     import argparse
     parser = argparse.ArgumentParser(description="Run Recommender")
-    parser.add_argument('--model', nargs='?', help='Choose a recommender.', required=True)
+    parser.add_argument('--model', nargs='?', help='Choose a recommender.', required=True) # 'TransCF', 'CRML', 'LRML', 'SFCML', 'CPE', 'COCML', 'HarCML'
     parser.add_argument('--data_path', nargs='?', help='Choose a dataset.', required=True)        
     parser.add_argument('--lr', type=float, default=0.05, help='Learning rate.', required=True)
-    parser.add_argument('--topks', nargs='?', default=[3, 5, 10, 20], help="topK")
-    parser.add_argument('--epoch', type=int, default=500, help='Number of epochs.')
+    parser.add_argument('--topks', nargs='?', default=[3, 5, 10, 20, 30, 50], help="topK")
+    parser.add_argument('--epoch', type=int, default=100, help='Number of epochs.')
     parser.add_argument('--num_negs', type=int, default=10, help='Number of negative samples.')
-    parser.add_argument('--margin', type=float, default=2.0, help='Margin.')
+    parser.add_argument('--margin', type=float, default=1.0, help='Margin.')
     parser.add_argument('--batch_size', type=int, default=256, help='Batch size.')
-    parser.add_argument('--dim', type=int, default=256, help='Number of embedding dimensions.')
+    parser.add_argument('--dim', type=int, default=100, help='Number of embedding dimensions.')
     parser.add_argument('--random_seed', type=int, default=1234, help='Random seed.')
-    parser.add_argument('--sampling_strategy', type=str, default='uniform')
+    # parser.add_argument('--sampling_strategy', type=str, default='uniform')
     parser.add_argument('--split_ratio', type=tuple, default=(3,1,1), help='fraction to split the data')
     parser.add_argument('--max_norm', type=float, default=1.0)
     parser.add_argument('--weight_decay', type=float, default=1e-5)
@@ -121,25 +131,52 @@ def train(args, model, logger, metric_evaluator, train_loader):
 
         logger.info('\n========> Epoch %3d: '% epoch) 
         model.train()
-        train_loader.dataset.generate_triplets_by_sampling() # conduct negative sampling before training
+        if args.model == 'SFCML':
+            scheduler_opt = lr_scheduler.ReduceLROnPlateau(opt, 
+                                                   mode="max", 
+                                                   factor=0.99,
+                                                   patience=5,
+                                                   threshold=0.0001, 
+                                                   verbose=True
+                                                   ) # Optional
+            train_loader._start()
 
-        for it, (user_ids, pos_ids, neg_ids) in enumerate(train_loader):
+            for it in tqdm(range(len(train_loader)), desc="Opt. with FastCML loss"):
+                user_ids = train_loader.next_batch()
+                user_ids = user_ids.long().cuda()
 
-            user_ids = user_ids.cuda()
-            pos_ids = pos_ids.cuda()
-            neg_ids = neg_ids.cuda()
+                loss = model(user_ids)
 
-            loss = model(user_ids, pos_ids, neg_ids)
+                opt.zero_grad()
+                loss.backward()
+                
+                opt.step()
+                
+                logger.info('======> Iter %4d/%4d:  loss: %.4f'%(it, len(train_loader), loss.mean().item()))
+                
+                model.ClipItemNorm()
+                model.ClipUserNorm()
+        else:
 
-            opt.zero_grad()
-            loss.backward() 
-            opt.step()
+            train_loader.dataset.generate_triplets_by_sampling() # conduct negative sampling before training
 
-            if it % 1000 == 0 or it == len(train_loader) - 1:
-                logger.info('Iter %4d/%4d:  loss: %.4f'%(it, len(train_loader), loss.mean().item()))
+            for it, (user_ids, pos_ids, neg_ids) in enumerate(train_loader):
+
+                user_ids = user_ids.cuda()
+                pos_ids = pos_ids.cuda()
+                neg_ids = neg_ids.cuda()
+
+                loss = model(user_ids, pos_ids, neg_ids)
+
+                opt.zero_grad()
+                loss.backward() 
+                opt.step()
+
+                if it % 1000 == 0 or it == len(train_loader) - 1:
+                    logger.info('Iter %4d/%4d:  loss: %.4f'%(it, len(train_loader), loss.mean().item()))
         
-        # Clip user/item embeddings for regularizations.
-        model.ClipNorm()
+            # Clip user/item embeddings for regularizations.
+            # model.ClipNorm()
 
         logger.info('\n========> Evaluating validation set...')
         _auc = test(model, logger, val_users, val_evaluator, args.topks, epoch)
@@ -162,7 +199,6 @@ if __name__ == '__main__':
     
     save_path = os.path.join(args.data_path, 
                              args.model,
-                             args.sampling_strategy, 
                              'margin_{}'.format(args.margin),
                              'num_negs_{}'.format(args.num_negs))
     if not os.path.exists(save_path):
@@ -216,7 +252,8 @@ if __name__ == '__main__':
     test_evaluator = Evaluator(num_users, num_items, user_train_matrix, user_test_matrix, on_train=retain_train)
 
     if args.model == 'SFCML':
-        train_set = UserDataset(num_whole_users=num_users)
+        from dataloader import _DataLoader
+        train_loader =  _DataLoader([i for i in range(num_users)], batch_size = args.batch_size, shuffle = True)
         model = SUPPORT_MODEL[args.model](args, 
                     num_users,
                     num_items,
@@ -226,7 +263,7 @@ if __name__ == '__main__':
     else:
         train_set = SampleDataset(user_train_matrix, 
                                 args.num_negs, 
-                                args.sampling_strategy, 
+                                ALL_SAMS[args.model], 
                                 args.random_seed)
 
         if args.model == 'CPE':
@@ -277,10 +314,10 @@ if __name__ == '__main__':
         else:
             raise NotImplementedError
         
-    train_loader =  DataLoader(train_set,
-                                batch_size = args.batch_size, 
-                                shuffle = True,
-                                pin_memory=True)
+        train_loader =  DataLoader(train_set,
+                                    batch_size = args.batch_size, 
+                                    shuffle = True,
+                                    pin_memory=True)
     metric_evaluator = {
             'train_evaluator': train_evaluator,
             'val_evaluator': val_evaluator,

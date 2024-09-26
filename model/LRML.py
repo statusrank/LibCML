@@ -27,8 +27,8 @@ class LRML(nn.Module):
         self.margin = margin
         self.clip_max = clip_max
 
-        self.user_embeddings = nn.Embedding(num_users, dim, max_norm=clip_max)
-        self.item_embeddings = nn.Embedding(num_items, dim, max_norm=clip_max)
+        self.user_embeddings = nn.Embedding(num_users, dim)# 
+        self.item_embeddings = nn.Embedding(num_items, dim) # max_norm=clip_max
         self.user_item_key = nn.Embedding(dim, num_mems)
         self.memories = nn.Embedding(num_mems, dim)
 
@@ -38,11 +38,11 @@ class LRML(nn.Module):
     @torch.no_grad()
     def ClipNorm(self):
         pass
-        # self.user_embeddings.weight.data.div_(torch.norm(self.user_embeddings.weight.data, 2, 1, True).expand_as(
-        #     self.user_embeddings.weight.data)).mul_(self.clip_max)
+        self.user_embeddings.weight.data.div_(torch.norm(self.user_embeddings.weight.data, 2, 1, True).expand_as(
+            self.user_embeddings.weight.data)).mul_(self.clip_max)
         
-        # self.item_embeddings.weight.data.div_(torch.norm(self.item_embeddings.weight.data, 2, 1, True).expand_as(
-        #     self.item_embeddings.weight.data)).mul_(self.clip_max)
+        self.item_embeddings.weight.data.div_(torch.norm(self.item_embeddings.weight.data, 2, 1, True).expand_as(
+            self.item_embeddings.weight.data)).mul_(self.clip_max)
 
     def forward(self, user_ids, pos_ids, neg_ids):
         
@@ -50,7 +50,7 @@ class LRML(nn.Module):
         pos_item_embeddings = self.item_embeddings(pos_ids).cuda() # (batch, dim)
         neg_item_embeddings = self.item_embeddings(neg_ids).cuda() # (batch, dim)
 
-        user_pos_s = user_embeddings * pos_item_embeddings # (batch, dim)
+        user_pos_s = torch.mul(user_embeddings, pos_item_embeddings)# (batch, dim)
         attention_weight = F.softmax(user_pos_s.mm(self.user_item_key.weight), dim=-1) # (batch, N)
 
         latent_rel_vec = attention_weight.mm(self.memories.weight) # (batch, dim)

@@ -33,13 +33,13 @@ class CRML(nn.Module):
         self.alpha = alpha
         self.beta = beta
 
-        self.user_embeddings = nn.Embedding(self.num_users, self.dim, max_norm=self.clip_max)
-        self.item_embeddings = nn.Embedding(self.num_items, self.dim, max_norm=self.clip_max)
+        self.user_embeddings = nn.Embedding(self.num_users, self.dim)
+        self.item_embeddings = nn.Embedding(self.num_items, self.dim)
 
-        self.co_user_embeddings = nn.Embedding(self.num_users, self.dim, max_norm=self.clip_max)
+        self.co_user_embeddings = nn.Embedding(self.num_users, self.dim)
         self.co_user_bias = nn.Parameter(torch.randn([self.num_users, 1]))
 
-        self.co_item_embeddings = nn.Embedding(self.num_items, self.dim, max_norm=self.clip_max)
+        self.co_item_embeddings = nn.Embedding(self.num_items, self.dim)
         self.co_item_bias = nn.Parameter(torch.randn([self.num_items, 1]))
 
         self.user_interactions_counts = {u: set(row) for u, row in enumerate(self.user_item_interactions.rows)}

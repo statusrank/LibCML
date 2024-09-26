@@ -83,8 +83,6 @@ class Evaluator(object):
                 ndcg_k.append(float(_dcg / _idcg))
         
         return np.mean(precision_k), np.mean(recall_k), np.mean(ndcg_k)
-
-
     
     def map_mrr_auc_ndcg(self, model, users, k = 3):
         '''
